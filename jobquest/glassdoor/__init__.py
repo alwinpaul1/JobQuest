@@ -260,6 +260,9 @@ class Glassdoor(Scraper):
         desc = data["data"]["jobview"]["job"]["description"]
         if self.scraper_input.description_format == DescriptionFormat.MARKDOWN:
             desc = markdown_converter(desc)
+        elif self.scraper_input.description_format == DescriptionFormat.PLAIN:
+            from jobquest.util import plain_converter
+            desc = plain_converter(desc)
         return desc
 
     def _get_location(self, location: str, is_remote: bool) -> (int, str):
