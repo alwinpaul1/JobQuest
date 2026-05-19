@@ -13,18 +13,43 @@ from requests.adapters import HTTPAdapter, Retry
 
 from jobquest.model import CompensationInterval, JobType, Site
 
-_EXP_RANGE_RE = re.compile(r'(\d+)\+?\s*(?:-\s*(\d+))?\s*(?:years?|Jahre)', re.IGNORECASE)
+_EXP_RANGE_RE = re.compile(
+    r'(?:(?:minimum|at\s+least|mindestens)\s+)?'   # optional prefix: "minimum", "at least", "mindestens"
+    r'(\d+)\+?\s*(?:-\s*(\d+))?\s*'                # X or X-Y (with optional +)
+    r'(?:years?|Jahre|ans|jaar)'                    # unit: English / German / French / Dutch
+    r'(?:\s+(?:of\s+)?(?:experience|Berufserfahrung))?',  # optional trailing qualifier
+    re.IGNORECASE,
+)
+
+# Standalone pattern: "Berufserfahrung" (or similar) near a number, e.g. "3 Jahre Berufserfahrung"
+_EXP_BERUF_RE = re.compile(
+    r'(\d+)\+?\s*(?:-\s*(\d+))?\s*Jahre\s+Berufserfahrung',
+    re.IGNORECASE,
+)
+
+_TITLE_EXPERIENCE_MAP = [
+    (re.compile(r'\b(?:intern|werkstudent|working\s+student)\b', re.IGNORECASE), '0-1 years'),
+    (re.compile(r'\b(?:junior|entry[\s-]level|graduate)\b', re.IGNORECASE), '0-2 years'),
+    (re.compile(r'\b(?:senior|lead|principal|staff)\b', re.IGNORECASE), '5+ years'),
+    (re.compile(r'\b(?:head\s+of|director|vp\s)\b', re.IGNORECASE), '10+ years'),
+]
 
 
-def extract_experience_range(description: str) -> str | None:
-    if not description:
-        return None
-    match = _EXP_RANGE_RE.search(description)
-    if not match:
-        return None
-    if match.group(2):
-        return f"{match.group(1)}-{match.group(2)} years"
-    return f"{match.group(1)}+ years"
+def extract_experience_range(description: str | None = None, title: str | None = None) -> str | None:
+    if description:
+        for pattern in (_EXP_BERUF_RE, _EXP_RANGE_RE):
+            match = pattern.search(description)
+            if match:
+                if match.group(2):
+                    return f"{match.group(1)}-{match.group(2)} years"
+                return f"{match.group(1)}+ years"
+
+    if title:
+        for pattern, result in _TITLE_EXPERIENCE_MAP:
+            if pattern.search(title):
+                return result
+
+    return None
 
 
 def gql_escape(s: str) -> str:

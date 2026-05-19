@@ -227,7 +227,7 @@ class Indeed(Scraper):
         employer_details = employer.get("employerDetails", {}) if employer else {}
         rel_url = job["employer"]["relativeCompanyPageUrl"] if job["employer"] else None
 
-        experience_range = extract_experience_range(description)
+        experience_range = extract_experience_range(description, job["title"])
 
         return JobPost(
             id=f'in-{job["key"]}',

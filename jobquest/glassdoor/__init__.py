@@ -18,6 +18,7 @@ from urllib.parse import quote
 
 from jobquest.util import (
     extract_emails_from_text,
+    extract_experience_range,
     create_logger,
     create_session,
     create_stealth_session,
@@ -202,6 +203,9 @@ class Glassdoor(Scraper):
             description = self._fetch_job_description(job_id)
         except Exception:
             description = None
+
+        experience_range = extract_experience_range(description, title)
+
         company_url = f"{self.base_url}Overview/W-EI_IE{company_id}.htm"
         company_logo = (
             job_data["jobview"].get("overview", {}).get("squareLogoUrl", None)
@@ -236,6 +240,7 @@ class Glassdoor(Scraper):
             listing_type=f"{'easy_apply ' if easy_apply else ''}{listing_type}".strip(),
             job_level=str(rating) if rating else None,
             company_industry=company_industry,
+            experience_range=experience_range,
         )
 
     def _fetch_job_description(self, job_id):

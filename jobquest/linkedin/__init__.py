@@ -235,7 +235,7 @@ class LinkedIn(Scraper):
             description = job_details.get("description")
         is_remote = is_job_remote(title, description, location)
 
-        experience_range = extract_experience_range(description)
+        experience_range = extract_experience_range(description, title)
 
         return JobPost(
             id=f"li-{job_id}",
