@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.7 (2026-05-19)
+- **fix:** Deterministic output — stable mergesort with `id` tiebreaker (was non-stable quicksort over day-granularity dates with huge tie groups, making identical result sets appear reordered run-to-run)
+- **fix:** Dedup now runs *after* the stable sort so `keep="first"` operates on deterministic order
+- Verified: identical queries now produce byte-identical ordering; `hours_old` overfetch path is bit-stable (symdiff=0)
+
 ## 0.1.6 (2026-05-19)
 - **fix:** Indeed regression — overfetch 2x when `hours_old` is set so client-side date filter doesn't starve results (AI Engineer 25→11 on v0.1.5, now back to 28)
 - **fix:** Remove incorrect global `head(results_wanted)` cap — `results_wanted` is per-site, not total

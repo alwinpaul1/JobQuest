@@ -205,11 +205,15 @@ def scrape_jobs(
                     f"hours_old={hours_old}: removed {filtered_count} stale jobs (before {cutoff})"
                 )
 
+        jobs_df = jobs_df.sort_values(
+            by=["date_posted", "site", "id"],
+            ascending=[False, True, True],
+            kind="mergesort",
+        ).reset_index(drop=True)
+
         jobs_df = jobs_df.drop_duplicates(subset=["job_url"], keep="first")
 
-        return jobs_df.sort_values(
-            by=["date_posted", "site"], ascending=[False, True]
-        ).reset_index(drop=True)
+        return jobs_df.reset_index(drop=True)
     else:
         return pd.DataFrame()
 
