@@ -74,6 +74,8 @@ def scrape_jobs(
 
     country_enum = Country.from_string(country_indeed)
 
+    fetch_wanted = min(results_wanted * 2, results_wanted + 50) if hours_old else results_wanted
+
     scraper_input = ScraperInput(
         site_type=get_site_type(),
         country=country_enum,
@@ -85,7 +87,7 @@ def scrape_jobs(
         easy_apply=easy_apply,
         description_format=description_format,
         linkedin_fetch_description=linkedin_fetch_description,
-        results_wanted=results_wanted,
+        results_wanted=fetch_wanted,
         linkedin_company_ids=linkedin_company_ids,
         offset=offset,
         hours_old=hours_old,
