@@ -384,4 +384,6 @@ desired_order = [
     "company_num_employees",
     "company_revenue",
     "company_description",
+    "skills",
+    "experience_range",
 ]

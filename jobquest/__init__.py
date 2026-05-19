@@ -174,6 +174,10 @@ def scrape_jobs(
                 else None
             )
 
+            job_data["skills"] = (
+                ", ".join(job_data["skills"]) if job_data.get("skills") else None
+            )
+
             job_df = pd.DataFrame([job_data])
             jobs_dfs.append(job_df)
 

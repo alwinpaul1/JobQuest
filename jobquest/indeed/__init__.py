@@ -221,11 +221,23 @@ class Indeed(Scraper):
             description = plain_converter(description)
 
         job_type = get_job_type(job["attributes"])
+        skills = [
+            attr["label"] for attr in job.get("attributes", [])
+            if attr.get("label") and attr.get("key") not in ("CF3CP", "75GKK", "NJXCK", "VDTG7", "DSQF7")
+        ] or None
         timestamp_seconds = job["datePublished"] / 1000
         date_posted = datetime.fromtimestamp(timestamp_seconds).strftime("%Y-%m-%d")
         employer = job["employer"].get("dossier") if job["employer"] else None
         employer_details = employer.get("employerDetails", {}) if employer else {}
         rel_url = job["employer"]["relativeCompanyPageUrl"] if job["employer"] else None
+
+        experience_range = None
+        if description:
+            import re as _re
+            exp_match = _re.search(r'(\d+)\+?\s*(?:-\s*(\d+))?\s*(?:years?|Jahre)', description, _re.IGNORECASE)
+            if exp_match:
+                experience_range = f"{exp_match.group(1)}-{exp_match.group(2)} years" if exp_match.group(2) else f"{exp_match.group(1)}+ years"
+
         return JobPost(
             id=f'in-{job["key"]}',
             title=job["title"],
@@ -271,4 +283,6 @@ class Indeed(Scraper):
                 if employer and employer.get("images")
                 else None
             ),
+            skills=skills,
+            experience_range=experience_range,
         )

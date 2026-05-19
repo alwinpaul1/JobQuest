@@ -234,6 +234,13 @@ class LinkedIn(Scraper):
             description = job_details.get("description")
         is_remote = is_job_remote(title, description, location)
 
+        experience_range = None
+        if description:
+            import re as _re
+            exp_match = _re.search(r'(\d+)\+?\s*(?:-\s*(\d+))?\s*(?:years?|Jahre)', description, _re.IGNORECASE)
+            if exp_match:
+                experience_range = f"{exp_match.group(1)}-{exp_match.group(2)} years" if exp_match.group(2) else f"{exp_match.group(1)}+ years"
+
         return JobPost(
             id=f"li-{job_id}",
             title=title,
@@ -252,6 +259,7 @@ class LinkedIn(Scraper):
             emails=extract_emails_from_text(description),
             company_logo=job_details.get("company_logo"),
             job_function=job_details.get("job_function"),
+            experience_range=experience_range,
         )
 
     def _get_job_details(self, job_id: str) -> dict:

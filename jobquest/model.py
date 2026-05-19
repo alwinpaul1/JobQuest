@@ -268,6 +268,10 @@ class JobPost(BaseModel):
     # LinkedIn only atm
     job_function: str | None = None
 
+    # Cross-site enrichment
+    skills: list[str] | None = None
+    experience_range: str | None = None
+
 class JobResponse(BaseModel):
     jobs: list[JobPost] = []
 
