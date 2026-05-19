@@ -14,12 +14,15 @@ from jobquest.glassdoor.util import (
     parse_location,
 )
 from jobquest.stealth import SCRAPLING_AVAILABLE, stealth_fetch, ResponseAdapter
+from urllib.parse import quote
+
 from jobquest.util import (
     extract_emails_from_text,
     create_logger,
     create_session,
     create_stealth_session,
     markdown_converter,
+    plain_converter,
 )
 from jobquest.exception import GlassdoorException
 from jobquest.model import (
@@ -197,7 +200,7 @@ class Glassdoor(Scraper):
         compensation = parse_compensation(job["header"])
         try:
             description = self._fetch_job_description(job_id)
-        except:
+        except Exception:
             description = None
         company_url = f"{self.base_url}Overview/W-EI_IE{company_id}.htm"
         company_logo = (
@@ -269,14 +272,13 @@ class Glassdoor(Scraper):
         if self.scraper_input.description_format == DescriptionFormat.MARKDOWN:
             desc = markdown_converter(desc)
         elif self.scraper_input.description_format == DescriptionFormat.PLAIN:
-            from jobquest.util import plain_converter
             desc = plain_converter(desc)
         return desc
 
     def _get_location(self, location: str, is_remote: bool) -> (int, str):
         if not location or is_remote:
             return "11047", "STATE"
-        url = f"{self.base_url}/findPopularLocationAjax.htm?maxLocationsToReturn=10&term={location}"
+        url = f"{self.base_url}/findPopularLocationAjax.htm?maxLocationsToReturn=10&term={quote(location, safe='')}"
 
         res = self.session.get(url)
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
 from typing import Tuple
 
 import pandas as pd
@@ -192,7 +193,6 @@ def scrape_jobs(
         jobs_df = jobs_df[desired_order]
 
         if hours_old and "date_posted" in jobs_df.columns:
-            from datetime import datetime, timedelta
             cutoff = (datetime.now() - timedelta(hours=hours_old)).strftime("%Y-%m-%d")
             jobs_df["date_posted"] = pd.to_datetime(jobs_df["date_posted"], errors="coerce")
             before = len(jobs_df)

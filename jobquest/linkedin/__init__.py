@@ -34,6 +34,7 @@ from jobquest.model import (
 from jobquest.stealth import SCRAPLING_AVAILABLE
 from jobquest.util import (
     extract_emails_from_text,
+    extract_experience_range,
     currency_parser,
     markdown_converter,
     plain_converter,
@@ -226,7 +227,7 @@ class LinkedIn(Scraper):
             datetime_str = datetime_tag["datetime"]
             try:
                 date_posted = datetime.strptime(datetime_str, "%Y-%m-%d")
-            except:
+            except Exception:
                 date_posted = None
         job_details = {}
         if full_descr:
@@ -234,12 +235,7 @@ class LinkedIn(Scraper):
             description = job_details.get("description")
         is_remote = is_job_remote(title, description, location)
 
-        experience_range = None
-        if description:
-            import re as _re
-            exp_match = _re.search(r'(\d+)\+?\s*(?:-\s*(\d+))?\s*(?:years?|Jahre)', description, _re.IGNORECASE)
-            if exp_match:
-                experience_range = f"{exp_match.group(1)}-{exp_match.group(2)} years" if exp_match.group(2) else f"{exp_match.group(1)}+ years"
+        experience_range = extract_experience_range(description)
 
         return JobPost(
             id=f"li-{job_id}",
@@ -273,7 +269,7 @@ class LinkedIn(Scraper):
                 f"{self.base_url}/jobs/view/{job_id}", timeout=5
             )
             response.raise_for_status()
-        except:
+        except Exception:
             return {}
         if "linkedin.com/signup" in response.url:
             return {}

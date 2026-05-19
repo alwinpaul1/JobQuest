@@ -19,11 +19,16 @@ from jobquest.model import (
 from jobquest.stealth import SCRAPLING_AVAILABLE
 from jobquest.util import (
     extract_emails_from_text,
+    extract_experience_range,
+    gql_escape,
     markdown_converter,
+    plain_converter,
     create_session,
     create_stealth_session,
     create_logger,
 )
+
+_JOB_TYPE_KEYS = frozenset(("CF3CP", "75GKK", "NJXCK", "VDTG7", "DSQF7"))
 
 log = create_logger("Indeed")
 
@@ -35,7 +40,7 @@ class Indeed(Scraper):
         """
         Initializes IndeedScraper with the Indeed API url
         """
-        super().__init__(Site.INDEED, proxies=proxies)
+        super().__init__(Site.INDEED, proxies=proxies, ca_cert=ca_cert, user_agent=user_agent)
 
         if SCRAPLING_AVAILABLE:
             self.session = create_stealth_session(
@@ -96,16 +101,8 @@ class Indeed(Scraper):
         jobs = []
         new_cursor = None
         filters = self._build_filters()
-        search_term = (
-            self.scraper_input.search_term.replace('"', '\\"')
-            if self.scraper_input.search_term
-            else ""
-        )
-        location_escaped = (
-            self.scraper_input.location.replace("\\", "\\\\").replace('"', '\\"')
-            if self.scraper_input.location
-            else ""
-        )
+        search_term = gql_escape(self.scraper_input.search_term) if self.scraper_input.search_term else ""
+        location_escaped = gql_escape(self.scraper_input.location) if self.scraper_input.location else ""
         query = job_search_query.format(
             what=(f'what: "{search_term}"' if search_term else ""),
             location=(
@@ -217,13 +214,12 @@ class Indeed(Scraper):
         if self.scraper_input.description_format == DescriptionFormat.MARKDOWN:
             description = markdown_converter(description)
         elif self.scraper_input.description_format == DescriptionFormat.PLAIN:
-            from jobquest.util import plain_converter
             description = plain_converter(description)
 
         job_type = get_job_type(job["attributes"])
         skills = [
             attr["label"] for attr in job.get("attributes", [])
-            if attr.get("label") and attr.get("key") not in ("CF3CP", "75GKK", "NJXCK", "VDTG7", "DSQF7")
+            if attr.get("label") and attr.get("key") not in _JOB_TYPE_KEYS
         ] or None
         timestamp_seconds = job["datePublished"] / 1000
         date_posted = datetime.fromtimestamp(timestamp_seconds).strftime("%Y-%m-%d")
@@ -231,12 +227,7 @@ class Indeed(Scraper):
         employer_details = employer.get("employerDetails", {}) if employer else {}
         rel_url = job["employer"]["relativeCompanyPageUrl"] if job["employer"] else None
 
-        experience_range = None
-        if description:
-            import re as _re
-            exp_match = _re.search(r'(\d+)\+?\s*(?:-\s*(\d+))?\s*(?:years?|Jahre)', description, _re.IGNORECASE)
-            if exp_match:
-                experience_range = f"{exp_match.group(1)}-{exp_match.group(2)} years" if exp_match.group(2) else f"{exp_match.group(1)}+ years"
+        experience_range = extract_experience_range(description)
 
         return JobPost(
             id=f'in-{job["key"]}',

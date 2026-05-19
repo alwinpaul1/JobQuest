@@ -12,6 +12,28 @@ from markdownify import markdownify as md
 from requests.adapters import HTTPAdapter, Retry
 
 from jobquest.model import CompensationInterval, JobType, Site
+
+_EXP_RANGE_RE = re.compile(r'(\d+)\+?\s*(?:-\s*(\d+))?\s*(?:years?|Jahre)', re.IGNORECASE)
+
+
+def extract_experience_range(description: str) -> str | None:
+    if not description:
+        return None
+    match = _EXP_RANGE_RE.search(description)
+    if not match:
+        return None
+    if match.group(2):
+        return f"{match.group(1)}-{match.group(2)} years"
+    return f"{match.group(1)}+ years"
+
+
+def gql_escape(s: str) -> str:
+    if not s:
+        return ""
+    return (s.replace("\\", "\\\\").replace('"', '\\"')
+             .replace("\n", " ").replace("\r", " ")
+             .replace("{", "").replace("}", "")
+             .replace("(", "").replace(")", ""))
 from jobquest.stealth import SCRAPLING_AVAILABLE, StealthSession, stealth_fetch
 
 
