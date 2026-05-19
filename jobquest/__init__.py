@@ -178,23 +178,31 @@ def scrape_jobs(
             jobs_dfs.append(job_df)
 
     if jobs_dfs:
-        # Step 1: Filter out all-NA columns from each DataFrame before concatenation
         filtered_dfs = [df.dropna(axis=1, how="all") for df in jobs_dfs]
-
-        # Step 2: Concatenate the filtered DataFrames
         jobs_df = pd.concat(filtered_dfs, ignore_index=True)
 
-        # Step 3: Ensure all desired columns are present, adding missing ones as empty
         for column in desired_order:
             if column not in jobs_df.columns:
-                jobs_df[column] = None  # Add missing columns as empty
+                jobs_df[column] = None
 
-        # Reorder the DataFrame according to the desired order
         jobs_df = jobs_df[desired_order]
 
-        # Step 4: Sort the DataFrame as required
+        if hours_old and "date_posted" in jobs_df.columns:
+            from datetime import datetime, timedelta
+            cutoff = (datetime.now() - timedelta(hours=hours_old)).strftime("%Y-%m-%d")
+            jobs_df["date_posted"] = pd.to_datetime(jobs_df["date_posted"], errors="coerce")
+            before = len(jobs_df)
+            jobs_df = jobs_df[jobs_df["date_posted"].isna() | (jobs_df["date_posted"] >= cutoff)]
+            filtered_count = before - len(jobs_df)
+            if filtered_count > 0:
+                create_logger("Filter").info(
+                    f"hours_old={hours_old}: removed {filtered_count} stale jobs (before {cutoff})"
+                )
+
+        jobs_df = jobs_df.drop_duplicates(subset=["job_url"], keep="first")
+
         return jobs_df.sort_values(
-            by=["site", "date_posted"], ascending=[True, False]
+            by=["date_posted", "site"], ascending=[False, True]
         ).reset_index(drop=True)
     else:
         return pd.DataFrame()

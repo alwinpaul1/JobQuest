@@ -150,29 +150,27 @@ class Glassdoor(Scraper):
 
     def _get_csrf_token(self):
         url = f"{self.base_url}/Job/computer-science-jobs.htm"
-        if SCRAPLING_AVAILABLE:
-            try:
-                resp = stealth_fetch(
-                    url,
-                    solve_cloudflare=True,
-                    headless=True,
-                    locale="en-US",
-                    proxy=self.proxies[0] if isinstance(self.proxies, list) and self.proxies else self.proxies,
-                )
-                self._cf_cookies = resp.cookies or {}
-                text = resp.text
-            except Exception as e:
-                log.warning(f"StealthyFetcher failed for CSRF, falling back: {e}")
-                res = self.session.get(url)
-                text = res.text
-        else:
-            res = self.session.get(url)
-            text = res.text
+        res = self.session.get(url)
+        text = res.text
 
         pattern = r'"token":\s*"([^"]+)"'
         matches = re.findall(pattern, text)
-        token = matches[0] if matches else None
-        return token
+        if matches:
+            return matches[0]
+
+        if res.status_code == 403 and SCRAPLING_AVAILABLE:
+            log.info("CSRF blocked (403), retrying with StealthyFetcher")
+            try:
+                proxy = self.proxies[0] if isinstance(self.proxies, list) and self.proxies else self.proxies
+                resp = stealth_fetch(url, solve_cloudflare=True, headless=True, locale="en-US", proxy=proxy)
+                self._cf_cookies = resp.cookies or {}
+                matches = re.findall(pattern, resp.text)
+                if matches:
+                    return matches[0]
+            except Exception as e:
+                log.warning(f"StealthyFetcher also failed for CSRF: {e}")
+
+        return None
 
     def _process_job(self, job_data):
         job_id = job_data["jobview"]["job"]["listingId"]
@@ -211,6 +209,13 @@ class Glassdoor(Scraper):
             .get("adOrderSponsorshipLevel", "")
             .lower()
         )
+        rating = job["header"].get("rating")
+        easy_apply = job["header"].get("easyApply", False)
+        job_level = job["header"].get("goc", "")
+        company_industry = (
+            job_data["jobview"].get("overview", {}).get("shortName", None)
+        )
+
         return JobPost(
             id=f"gd-{job_id}",
             title=title,
@@ -218,13 +223,16 @@ class Glassdoor(Scraper):
             company_name=company_name,
             date_posted=date_posted,
             job_url=job_url,
+            job_url_direct=job["header"].get("jobLink"),
             location=location,
             compensation=compensation,
             is_remote=is_remote,
             description=description,
             emails=extract_emails_from_text(description) if description else None,
             company_logo=company_logo,
-            listing_type=listing_type,
+            listing_type=f"{'easy_apply ' if easy_apply else ''}{listing_type}".strip(),
+            job_level=str(rating) if rating else None,
+            company_industry=company_industry,
         )
 
     def _fetch_job_description(self, job_id):
@@ -270,50 +278,28 @@ class Glassdoor(Scraper):
             return "11047", "STATE"
         url = f"{self.base_url}/findPopularLocationAjax.htm?maxLocationsToReturn=10&term={location}"
 
-        if SCRAPLING_AVAILABLE:
-            try:
-                resp = stealth_fetch(
-                    url,
-                    solve_cloudflare=True,
-                    headless=True,
-                    locale="en-US",
-                    proxy=self.proxies[0] if isinstance(self.proxies, list) and self.proxies else self.proxies,
-                )
-                if resp.status_code != 200:
-                    if resp.status_code == 429:
-                        log.error("429 Response - Blocked by Glassdoor for too many requests")
-                    else:
-                        log.error(f"Glassdoor response status code {resp.status_code}")
-                    return None, None
-                items = resp.json()
-            except Exception as e:
-                log.warning(f"StealthyFetcher failed for location, trying session: {e}")
-                return self._get_location_fallback(url)
-        else:
-            return self._get_location_fallback(url)
-
-        if not items:
-            raise ValueError(f"Location '{location}' not found on Glassdoor")
-        location_type = items[0]["locationType"]
-        if location_type == "C":
-            location_type = "CITY"
-        elif location_type == "S":
-            location_type = "STATE"
-        elif location_type == "N":
-            location_type = "COUNTRY"
-        return int(items[0]["locationId"]), location_type
-
-    def _get_location_fallback(self, url):
         res = self.session.get(url)
+
+        if res.status_code == 403 and SCRAPLING_AVAILABLE:
+            log.info("Location lookup blocked (403), retrying with StealthyFetcher")
+            try:
+                proxy = self.proxies[0] if isinstance(self.proxies, list) and self.proxies else self.proxies
+                resp = stealth_fetch(url, solve_cloudflare=True, headless=True, locale="en-US", proxy=proxy)
+                if resp.ok:
+                    res = resp
+            except Exception as e:
+                log.warning(f"StealthyFetcher also failed for location: {e}")
+
         if res.status_code != 200:
             if res.status_code == 429:
                 log.error("429 Response - Blocked by Glassdoor for too many requests")
             else:
                 log.error(f"Glassdoor response status code {res.status_code}")
             return None, None
+
         items = res.json()
         if not items:
-            return None, None
+            raise ValueError(f"Location '{location}' not found on Glassdoor")
         location_type = items[0]["locationType"]
         if location_type == "C":
             location_type = "CITY"
