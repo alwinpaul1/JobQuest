@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.8 (2026-05-20)
+- **fix:** Glassdoor URL missing `/` separator (`glassdoor.dejob-listing` → `glassdoor.de/job-listing`) — was causing Telegram `Button_url_invalid`
+- **fix:** Glassdoor `locationType="S"` no longer blindly treated as remote; state-level locations like Hamburg now extracted correctly (Hamburg was being silently dropped, jobs shown without location)
+- **fix:** Glassdoor crash when `ageInDays=None` — moved `timedelta` computation inside guard
+- **feat:** Indeed company name fallbacks for anonymous/sponsored listings — extract from `relativeCompanyPageUrl` (`/cmp/Zenjob` → `Zenjob`), from title patterns ("Praktikum bei Horbach"), and from description bold tags / "About us" / "Welcome to" patterns. Catches 99.2% of cases that previously had `null` company.
+
 ## 0.1.7 (2026-05-19)
 - **fix:** Deterministic output — stable mergesort with `id` tiebreaker (was non-stable quicksort over day-granularity dates with huge tie groups, making identical result sets appear reordered run-to-run)
 - **fix:** Dedup now runs *after* the stable sort so `keep="first"` operates on deterministic order

@@ -16,6 +16,8 @@ from jobquest.model import (
     JobType,
     DescriptionFormat,
 )
+import re as _re
+
 from jobquest.stealth import SCRAPLING_AVAILABLE
 from jobquest.util import (
     extract_emails_from_text,
@@ -27,6 +29,24 @@ from jobquest.util import (
     create_stealth_session,
     create_logger,
 )
+
+# Patterns to extract company name from title (e.g. "Praktikum bei Horbach Berlin")
+_TITLE_COMPANY_PATTERNS = [
+    _re.compile(r'\bbei\s+([A-Z][\w\s&\.\-]{2,40}?)(?:\s*[\(\,]|$)'),
+    _re.compile(r'\bat\s+([A-Z][\w\s&\.\-]{2,40}?)(?:\s*[\(\,]|$)'),
+    _re.compile(r'\b(?:für|@)\s+([A-Z][\w\s&\.\-]{2,40}?)(?:\s*[\(\,]|$)'),
+]
+
+# Patterns to extract company name from description HTML (no extra HTTP needed)
+_DESC_COMPANY_PATTERNS = [
+    _re.compile(r'About us:\s*(?:Grow with\s+)?([A-Z][\w\s&\.\-]{2,40}?)[!\.\?<\n]', _re.IGNORECASE),
+    _re.compile(r'Welcome to\s+([A-Z][\w\s&\.\-]{2,40}?)[!\.\?\,<\n]'),
+    _re.compile(r'(?:Join|At)\s+([A-Z][\w&\.\-]+(?:\s+[A-Z][\w&\.\-]+){0,3})[\s,!\.<]'),
+    _re.compile(r'<b>\s*About\s+([A-Z][\w\s&\.\-]{2,40}?)\s*</b>'),
+    _re.compile(r'\bBei\s+<b>([A-Z][\w\s&\.\-]{2,40}?)</b>'),
+    _re.compile(r'<b>([A-Z][A-Z0-9][\w\s&\.\-]{2,40}?)</b>\s+verbinden', _re.IGNORECASE),
+    _re.compile(r'<b>([A-Z][A-Z0-9][\w&\.\-]{2,40}?)</b>'),
+]
 
 _JOB_TYPE_KEYS = frozenset(("CF3CP", "75GKK", "NJXCK", "VDTG7", "DSQF7"))
 
@@ -227,13 +247,37 @@ class Indeed(Scraper):
         employer_details = employer.get("employerDetails", {}) if employer else {}
         rel_url = job["employer"]["relativeCompanyPageUrl"] if job["employer"] else None
 
+        company_name = None
+        if job.get("employer"):
+            company_name = job["employer"].get("name")
+            if not company_name and rel_url:
+                company_name = rel_url.rstrip("/").rsplit("/", 1)[-1].replace("-", " ").strip() or None
+        # Try title patterns: "Praktikum bei Horbach Berlin"
+        if not company_name and job.get("title"):
+            for pat in _TITLE_COMPANY_PATTERNS:
+                m = pat.search(job["title"])
+                if m:
+                    candidate = m.group(1).strip().rstrip(".!?,")
+                    if candidate and len(candidate) < 60 and candidate.lower() not in ("der", "die", "das", "and", "or", "und"):
+                        company_name = candidate
+                        break
+        # Try description patterns
+        if not company_name and description:
+            for pat in _DESC_COMPANY_PATTERNS:
+                m = pat.search(description)
+                if m:
+                    candidate = m.group(1).strip().rstrip(".!?,")
+                    if candidate and len(candidate) < 60:
+                        company_name = candidate
+                        break
+
         experience_range = extract_experience_range(description, job["title"])
 
         return JobPost(
             id=f'in-{job["key"]}',
             title=job["title"],
             description=description,
-            company_name=job["employer"].get("name") if job.get("employer") else None,
+            company_name=company_name,
             company_url=(f"{self.base_url}{rel_url}" if job["employer"] else None),
             company_url_direct=(
                 employer["links"]["corporateWebsite"] if employer else None

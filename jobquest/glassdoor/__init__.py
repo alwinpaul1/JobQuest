@@ -178,7 +178,7 @@ class Glassdoor(Scraper):
 
     def _process_job(self, job_data):
         job_id = job_data["jobview"]["job"]["listingId"]
-        job_url = f"{self.base_url}job-listing/j?jl={job_id}"
+        job_url = f"{self.base_url}/job-listing/j?jl={job_id}"
         if job_url in self.seen_urls:
             return None
         self.seen_urls.add(job_url)
@@ -190,13 +190,16 @@ class Glassdoor(Scraper):
         location_type = job["header"].get("locationType", "")
         age_in_days = job["header"].get("ageInDays")
         is_remote, location = False, None
-        date_diff = (datetime.now() - timedelta(days=age_in_days)).date()
-        date_posted = date_diff if age_in_days is not None else None
+        date_posted = (datetime.now() - timedelta(days=age_in_days)).date() if age_in_days is not None else None
 
-        if location_type == "S":
+        # locationType "S" = State-level (e.g. Hamburg, California). Don't blindly
+        # treat as remote — only when locationName actually indicates remote work.
+        if location_name and any(kw in location_name.lower() for kw in ("remote", "anywhere", "home office")):
             is_remote = True
-        else:
+        elif location_name:
             location = parse_location(location_name)
+        elif location_type == "S":
+            is_remote = True
 
         compensation = parse_compensation(job["header"])
         try:
