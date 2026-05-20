@@ -194,9 +194,14 @@ def scrape_jobs(
 
         jobs_df = jobs_df[desired_order]
 
+        # Normalize date_posted to pd.Timestamp so mixed datetime/date types
+        # don't break sort (LinkedIn now returns datetime with hour precision,
+        # Indeed/Glassdoor return date — pandas can't sort mixed types directly).
+        if "date_posted" in jobs_df.columns:
+            jobs_df["date_posted"] = pd.to_datetime(jobs_df["date_posted"], errors="coerce")
+
         if hours_old and "date_posted" in jobs_df.columns:
             cutoff = (datetime.now() - timedelta(hours=hours_old)).strftime("%Y-%m-%d")
-            jobs_df["date_posted"] = pd.to_datetime(jobs_df["date_posted"], errors="coerce")
             before = len(jobs_df)
             jobs_df = jobs_df[jobs_df["date_posted"].isna() | (jobs_df["date_posted"] >= cutoff)]
             filtered_count = before - len(jobs_df)

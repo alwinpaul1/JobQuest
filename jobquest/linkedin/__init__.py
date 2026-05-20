@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import random
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from urllib.parse import urlparse, urlunparse, unquote
 
@@ -223,12 +223,30 @@ class LinkedIn(Scraper):
                 "time", class_="job-search-card__listdate--new"
             )
         date_posted = None
-        if datetime_tag and "datetime" in datetime_tag.attrs:
-            datetime_str = datetime_tag["datetime"]
-            try:
-                date_posted = datetime.strptime(datetime_str, "%Y-%m-%d")
-            except Exception:
-                date_posted = None
+        if datetime_tag:
+            # LinkedIn's <time> has both `datetime` (YYYY-MM-DD) and text content
+            # like "20 hours ago" / "5 days ago". The text gives hour-level precision
+            # that the date attribute lacks — parse it when possible.
+            relative = datetime_tag.get_text(strip=True).lower()
+            m = re.search(r"(\d+)\s+(minute|hour|day|week|month|year)s?\s+ago", relative)
+            if m:
+                n, unit = int(m.group(1)), m.group(2)
+                delta_map = {
+                    "minute": timedelta(minutes=n),
+                    "hour": timedelta(hours=n),
+                    "day": timedelta(days=n),
+                    "week": timedelta(weeks=n),
+                    "month": timedelta(days=30 * n),
+                    "year": timedelta(days=365 * n),
+                }
+                date_posted = datetime.now() - delta_map[unit]
+            elif "datetime" in datetime_tag.attrs:
+                try:
+                    date_posted = datetime.strptime(
+                        datetime_tag["datetime"], "%Y-%m-%d"
+                    )
+                except Exception:
+                    date_posted = None
         job_details = {}
         if full_descr:
             job_details = self._get_job_details(job_id)

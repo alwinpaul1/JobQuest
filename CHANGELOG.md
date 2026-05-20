@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.9 (2026-05-20)
+- **feat:** LinkedIn now extracts hour-level precision from the `<time>` tag text
+  (e.g. "20 hours ago", "8 hours ago"). Previously we only used the `datetime`
+  attribute which is day-level. `date_posted` may now be a `datetime` with hour
+  precision; `JobPost.date_posted` typed as `datetime | date | None`.
+- **fix:** Normalize `date_posted` to `pd.Timestamp` in `scrape_jobs()` before
+  sort to avoid `TypeError` when mixing LinkedIn's datetime with Indeed/Glassdoor's
+  date in the same DataFrame.
+
 ## 0.1.8 (2026-05-20)
 - **fix:** Glassdoor URL missing `/` separator (`glassdoor.dejob-listing` → `glassdoor.de/job-listing`) — was causing Telegram `Button_url_invalid`
 - **fix:** Glassdoor `locationType="S"` no longer blindly treated as remote; state-level locations like Hamburg now extracted correctly (Hamburg was being silently dropped, jobs shown without location)
