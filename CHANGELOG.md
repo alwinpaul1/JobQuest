@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.11 (2026-05-23)
+- **fix:** Glassdoor jobs-API Cloudflare recovery now **retries** the stealth
+  solve up to 3× (breaks on first 200). Under datacenter-IP scrutiny the
+  undetected browser is intermittent (~2-in-3 attempts loop the challenge), so a
+  single solve sometimes failed; retrying makes recovery reliable without waiting
+  for the IP's reputation to cool down.
+
 ## 0.1.10 (2026-05-23)
 - **fix:** Glassdoor Cloudflare 403 recovery now actually works. Two bugs fixed:
   (1) the solved `cf_clearance` cookies were stored in `_cf_cookies` but never

@@ -124,22 +124,31 @@ class Glassdoor(Scraper):
             # is present (common on a cold session). Solve once with the undetected
             # browser (patchright), cache the cookies, and retry — instead of failing.
             if response.status_code == 403 and SCRAPLING_AVAILABLE:
-                log.info("Jobs API blocked (403), solving Cloudflare with stealth browser")
-                try:
-                    cf = stealth_fetch(
-                        f"{self.base_url}/Job/computer-science-jobs.htm",
-                        solve_cloudflare=True,
-                    )
-                    if cf.cookies:
-                        self._cf_cookies = cf.cookies
-                    response = self.session.post(
-                        f"{self.base_url}/graph",
-                        data=payload,
-                        timeout=15,
-                        cookies=self._cf_cookies or None,
-                    )
-                except Exception as e:
-                    log.warning(f"Cloudflare solve for jobs API failed: {e}")
+                # Under datacenter-IP scrutiny the stealth browser is intermittent
+                # (Cloudflare loops the challenge ~2-in-3 attempts), so retry the
+                # solve until a fresh cf_clearance gets us a 200. Each successful
+                # solve is ~8s; failures hit the browser timeout, so the bot's outer
+                # scrape timeout bounds the total.
+                for attempt in range(3):
+                    log.info(f"Jobs API 403 — solving Cloudflare (attempt {attempt + 1}/3)")
+                    try:
+                        cf = stealth_fetch(
+                            f"{self.base_url}/Job/computer-science-jobs.htm",
+                            solve_cloudflare=True,
+                        )
+                        if cf.cookies:
+                            self._cf_cookies = cf.cookies
+                        response = self.session.post(
+                            f"{self.base_url}/graph",
+                            data=payload,
+                            timeout=15,
+                            cookies=self._cf_cookies or None,
+                        )
+                        if response.status_code == 200:
+                            log.info(f"Cloudflare solved on attempt {attempt + 1}")
+                            break
+                    except Exception as e:
+                        log.warning(f"Cloudflare solve attempt {attempt + 1} failed: {e}")
             if response.status_code != 200:
                 exc_msg = f"bad response status code: {response.status_code}"
                 raise GlassdoorException(exc_msg)
