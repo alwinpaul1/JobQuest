@@ -15,7 +15,7 @@ log = logging.getLogger("JobQuest:Stealth")
 
 SCRAPLING_AVAILABLE = False
 try:
-    from scrapling.fetchers import Fetcher, FetcherSession, StealthyFetcher
+    from scrapling.fetchers import Fetcher, FetcherSession, StealthyFetcher, DynamicFetcher
     from scrapling.engines.static import FetcherClient as _FetcherClient
 
     SCRAPLING_AVAILABLE = True
@@ -173,24 +173,28 @@ def stealth_fetch(
     **kwargs,
 ) -> ResponseAdapter:
     """
-    Single-page fetch using StealthyFetcher (full Chromium browser).
+    Single-page fetch using Scrapling's DynamicFetcher backed by patchright
+    (undetected Playwright/Chromium).
 
-    Use for Cloudflare-protected pages where HTTP-only requests fail.
-    Returns a ResponseAdapter with .status_code, .text, .ok, etc.
+    Use for Cloudflare-protected pages where HTTP-only requests fail. patchright's
+    undetected browser passes Cloudflare's challenge on its own (network_idle waits
+    for it to clear), so this is far lighter and more reliable than the Camoufox
+    StealthyFetcher path (which hangs/crashes in many headless server environments).
+    `solve_cloudflare` is accepted for API compatibility but no longer needed.
+    Returns a ResponseAdapter with .status_code, .text, .cookies (incl. cf_clearance).
     """
     if not SCRAPLING_AVAILABLE:
         raise ImportError("scrapling is required for stealth_fetch — pip install scrapling")
 
-    resp = StealthyFetcher.fetch(
+    # Default timeout/wait are bumped vs the old Camoufox path: an undetected
+    # Chromium needs a few seconds for Cloudflare's JS challenge to settle.
+    resp = DynamicFetcher.fetch(
         url,
         headless=headless,
-        solve_cloudflare=solve_cloudflare,
-        disable_resources=True,
-        block_ads=True,
+        network_idle=True,
+        timeout=max(timeout, 60000),
+        wait=max(wait, 6000),
         proxy=proxy,
-        timeout=timeout,
-        wait=wait,
-        **kwargs,
     )
     return ResponseAdapter(resp)
 

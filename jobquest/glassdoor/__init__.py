@@ -118,7 +118,28 @@ class Glassdoor(Scraper):
                 f"{self.base_url}/graph",
                 data=payload,
                 timeout=15,
+                cookies=self._cf_cookies or None,
             )
+            # The jobs API 403s behind Cloudflare until a valid cf_clearance cookie
+            # is present (common on a cold session). Solve once with the undetected
+            # browser (patchright), cache the cookies, and retry — instead of failing.
+            if response.status_code == 403 and SCRAPLING_AVAILABLE:
+                log.info("Jobs API blocked (403), solving Cloudflare with stealth browser")
+                try:
+                    cf = stealth_fetch(
+                        f"{self.base_url}/Job/computer-science-jobs.htm",
+                        solve_cloudflare=True,
+                    )
+                    if cf.cookies:
+                        self._cf_cookies = cf.cookies
+                    response = self.session.post(
+                        f"{self.base_url}/graph",
+                        data=payload,
+                        timeout=15,
+                        cookies=self._cf_cookies or None,
+                    )
+                except Exception as e:
+                    log.warning(f"Cloudflare solve for jobs API failed: {e}")
             if response.status_code != 200:
                 exc_msg = f"bad response status code: {response.status_code}"
                 raise GlassdoorException(exc_msg)
@@ -154,7 +175,7 @@ class Glassdoor(Scraper):
 
     def _get_csrf_token(self):
         url = f"{self.base_url}/Job/computer-science-jobs.htm"
-        res = self.session.get(url)
+        res = self.session.get(url, cookies=self._cf_cookies or None)
         text = res.text
 
         pattern = r'"token":\s*"([^"]+)"'
@@ -288,7 +309,7 @@ class Glassdoor(Scraper):
             return "11047", "STATE"
         url = f"{self.base_url}/findPopularLocationAjax.htm?maxLocationsToReturn=10&term={quote(location, safe='')}"
 
-        res = self.session.get(url)
+        res = self.session.get(url, cookies=self._cf_cookies or None)
 
         if res.status_code == 403 and SCRAPLING_AVAILABLE:
             log.info("Location lookup blocked (403), retrying with StealthyFetcher")

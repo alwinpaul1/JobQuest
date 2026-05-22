@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.10 (2026-05-23)
+- **fix:** Glassdoor Cloudflare 403 recovery now actually works. Two bugs fixed:
+  (1) the solved `cf_clearance` cookies were stored in `_cf_cookies` but never
+  reused — now passed on every CSRF/location/jobs request via the `cookies=`
+  kwarg; (2) the jobs GraphQL POST (`/graph`) had **no** 403 recovery and raised
+  immediately — it now solves Cloudflare with the stealth browser, caches the
+  cookies, and retries.
+- **fix:** `stealth_fetch` now uses Scrapling's `DynamicFetcher` (backed by
+  **patchright**, undetected Playwright/Chromium) instead of the Camoufox
+  `StealthyFetcher`, which hangs/crashes (`EPIPE`) in many headless server
+  environments. patchright's undetected browser passes Cloudflare reliably
+  (~10s) and is far lighter. Requires `patchright install chromium` once.
+
 ## 0.1.9 (2026-05-20)
 - **feat:** LinkedIn now extracts hour-level precision from the `<time>` tag text
   (e.g. "20 hours ago", "8 hours ago"). Previously we only used the `datetime`
