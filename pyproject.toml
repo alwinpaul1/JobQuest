@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "jobquest"
-version = "0.1.11"
+version = "0.1.12"
 description = "Stealth job scraper for LinkedIn, Indeed & Glassdoor — powered by Scrapling"
 authors = ["Alwin Paul <alwin.paulpv@gmail.com>"]
 readme = "README.md"
@@ -38,5 +38,6 @@ scrapling = ">=0.2"
 curl-cffi = ">=0.7"
 browserforge = ">=1.0"
 patchright = ">=1.0"
+camoufox = ">=0.4"
 playwright = ">=1.40"
 msgspec = ">=0.18"

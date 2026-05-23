@@ -173,30 +173,43 @@ def stealth_fetch(
     **kwargs,
 ) -> ResponseAdapter:
     """
-    Single-page fetch using Scrapling's DynamicFetcher backed by patchright
-    (undetected Playwright/Chromium).
+    Single-page fetch that ACTIVELY solves Cloudflare, returning a ResponseAdapter
+    with .status_code, .text, .cookies (incl. cf_clearance).
 
-    Use for Cloudflare-protected pages where HTTP-only requests fail. patchright's
-    undetected browser passes Cloudflare's challenge on its own (network_idle waits
-    for it to clear), so this is far lighter and more reliable than the Camoufox
-    StealthyFetcher path (which hangs/crashes in many headless server environments).
-    `solve_cloudflare` is accepted for API compatibility but no longer needed.
-    Returns a ResponseAdapter with .status_code, .text, .cookies (incl. cf_clearance).
+    Primary engine: Scrapling's StealthyFetcher (Camoufox) with solve_cloudflare=True
+    — it detects the challenge type (non-interactive / managed / interactive /
+    Turnstile) and actually clicks the Turnstile widget, so it clears managed/Turnstile
+    challenges that a plain undetected-Chromium load cannot. Verified to obtain
+    cf_clearance on Glassdoor (incl. on a flagged datacenter IP) in ~10-25s.
+
+    Fallback: if Camoufox fails to launch (e.g. EPIPE in a constrained env), fall back
+    to DynamicFetcher (patchright/undetected Chromium), which clears only the basic /
+    non-interactive challenge. Requires `camoufox` + `patchright install chromium`.
     """
     if not SCRAPLING_AVAILABLE:
         raise ImportError("scrapling is required for stealth_fetch — pip install scrapling")
 
-    # Default timeout/wait are bumped vs the old Camoufox path: an undetected
-    # Chromium needs a few seconds for Cloudflare's JS challenge to settle.
-    resp = DynamicFetcher.fetch(
-        url,
-        headless=headless,
-        network_idle=True,
-        timeout=max(timeout, 60000),
-        wait=max(wait, 6000),
-        proxy=proxy,
-    )
-    return ResponseAdapter(resp)
+    try:
+        resp = StealthyFetcher.fetch(
+            url,
+            headless=headless,
+            solve_cloudflare=True,
+            network_idle=True,
+            timeout=max(timeout, 90000),
+            **({"proxy": proxy} if proxy else {}),
+        )
+        return ResponseAdapter(resp)
+    except Exception as e:
+        log.warning(f"StealthyFetcher (Camoufox) failed ({e}); falling back to DynamicFetcher")
+        resp = DynamicFetcher.fetch(
+            url,
+            headless=headless,
+            network_idle=True,
+            timeout=max(timeout, 60000),
+            wait=max(wait, 6000),
+            proxy=proxy,
+        )
+        return ResponseAdapter(resp)
 
 
 def stealth_fetch_with_cookies(

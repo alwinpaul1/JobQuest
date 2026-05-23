@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.12 (2026-05-23)
+- **fix:** Glassdoor Cloudflare now actually solved. `stealth_fetch` uses Scrapling's
+  `StealthyFetcher` (Camoufox) with `solve_cloudflare=True` — it detects the challenge
+  type and clicks the Turnstile widget, clearing managed/Turnstile challenges and
+  obtaining `cf_clearance` (verified on Glassdoor incl. on a flagged datacenter IP,
+  ~10-25s). Falls back to DynamicFetcher (patchright) if Camoufox can't launch. 0.1.10
+  had switched to patchright-only after a Camoufox EPIPE that was actually caused by the
+  missing `camoufox` package — now declared as a dependency.
+
 ## 0.1.11 (2026-05-23)
 - **fix:** Glassdoor jobs-API Cloudflare recovery now **retries** the stealth
   solve up to 3× (breaks on first 200). Under datacenter-IP scrutiny the
